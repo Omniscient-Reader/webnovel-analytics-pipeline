@@ -1,5 +1,6 @@
 import os
 import json
+import re
 import requests
 from bs4 import BeautifulSoup
 import psycopg2
@@ -7,6 +8,26 @@ from datetime import datetime
 from dotenv import load_dotenv
 
 load_dotenv(dotenv_path='/Users/birzhanmeyrkhan/webnovel-analytics/.env')
+
+def clean_single_genre(genre_str):
+    if not genre_str or not isinstance(genre_str, str):
+        return "Unknown"
+    if "http" in genre_str or "/" in genre_str:
+        match = re.search(r'(?:genre=|/tag/|/genres/)([^&]+)', genre_str, re.IGNORECASE)
+        if match:
+            genre_name = match.group(1)
+        else:
+            genre_name = genre_str.split('/')[-1].split('?')[0]
+        return genre_name.replace('-', ' ').title()
+    return genre_str.title()
+
+def extract_genre_name(genre_data):
+    if not genre_data:
+        return "Unknown"
+    if isinstance(genre_data, list):
+        cleaned_genres = [clean_single_genre(g) for g in genre_data if g]
+        return ", ".join(cleaned_genres) if cleaned_genres else "Unknown"
+    return clean_single_genre(genre_data)
 
 def scrape_and_update():
     conn = psycopg2.connect(
@@ -37,10 +58,11 @@ def scrape_and_update():
                 
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Қаралым мен Рейтингті JSON-LD ішінен таза күйінде аламыз
             json_element = soup.find('script', type='application/ld+json')
             views = 0
             rating_score = 0.0
+            author = "Unknown Author"
+            genre = "Unknown"
 
             if json_element:
                 data = json.loads(json_element.string)
@@ -48,22 +70,37 @@ def scrape_and_update():
                     views = int(data['interactionStatistic'].get('userInteractionCount', 0))
                 if 'aggregateRating' in data:
                     rating_score = float(data['aggregateRating'].get('ratingValue', 0.0))
-            
-            # Түзетілді: Тарау санын (chapter_count) Royal Road-тың кестесінен (tbody) дәлме-дәл есептейміз
+                if 'author' in data and 'name' in data['author']:
+                    author = data['author']['name']
+                if 'genre' in data:
+                    genre = extract_genre_name(data['genre'])
+
+            # --- ТАРАУ САНЫН ТАБУ ---
             chapters = 0
             chapters_table = soup.find('table', id='chapters')
             if chapters_table:
-                # Кестедегі әрбір <tr> (жол) — бұл бір тарау
                 chapters = len(chapters_table.find_all('tr', class_='chapter-row'))
             
-            # Егер кестеден табылмаса, ескі әдіспен іздеп көреді
             if chapters == 0:
-                chapters_element = soup.find(string=lambda t: t and 'Chapters' in t)
-                if chapters_element:
-                    try:
-                        chapters = int(''.join(filter(str.isdigit, chapters_element)))
-                    except ValueError:
-                        chapters = 0
+                chapters = len(soup.find_all('tr', class_='chapter-row'))
+                
+            if chapters == 0:
+                for li in soup.find_all('li'):
+                    if 'Chapters' in li.text:
+                        match = re.search(r'Chapters\s*:\s*(\d+)', li.text, re.IGNORECASE)
+                        if match:
+                            chapters = int(match.group(1))
+                            break
+
+            # ТҮЗЕТІЛДІ: Енді novels кестесінің өзінде де chapter_count жаңарады!
+            cursor.execute(
+                """
+                UPDATE novels 
+                SET author = %s, genre = %s, chapter_count = %s
+                WHERE novel_id = %s;
+                """,
+                (author, genre, chapters, novel_id)
+            )
 
             cursor.execute(
                 """
@@ -74,12 +111,13 @@ def scrape_and_update():
                 """,
                 (novel_id, datetime.today().date(), chapters, views, rating_score)
             )
-            print(f"Successfully updated metrics for {title}. Views: {views}, Rating: {rating_score}, Chapters: {chapters}")
+            conn.commit()
+            print(f"Updated {title}. Author: {author}, Genre: {genre}, Views: {views}, Chapters: {chapters}")
 
         except Exception as e:
+            conn.rollback()
             print(f"Error processing {title}: {e}")
 
-    conn.commit()
     cursor.close()
     conn.close()
 
