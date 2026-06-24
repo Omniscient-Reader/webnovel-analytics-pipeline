@@ -1,63 +1,90 @@
 # 📊 Webnovel Analytics & Time-Series Data Pipeline
 
-An automated, secure data engineering pipeline that scrapes metadata and 
-performance metrics from Royal Road novels, logs daily snapshots into a 
-PostgreSQL time-series database, and tracks growth velocity over time. 
+An automated data engineering pipeline that scrapes metadata and performance metrics from Royal Road novels, stores daily snapshots in PostgreSQL, and tracks growth trends over time.
 
-Built defensively to run seamlessly as a background microservice on macOS 
-using native automation tools.
+Designed to run as a lightweight background service on macOS using native scheduling tools.
 
 ---
 
 ## 🏗️ Architecture & Data Flow
 
-The project separates core book identity information from daily 
-performance metrics to enable clean time-series forecasting and trend 
-mapping.
+The project separates novel metadata from daily performance metrics to support historical analysis and time-series forecasting.
 
-1. **Target Tracking (novels table):** The scraping engine scans this 
-table for novel source URLs.
-2. **Extraction Engine (scraper.py):** Hits Royal Road using dynamic 
-headers via fake-useragent and parses active metrics (Views, Chapters, 
-Ratings) via BeautifulSoup.
-3. **Historical Storage (novel_daily_metrics table):** Appends a 
-structured chronological snapshot mapped directly to a historical 
-timeline.
-4. **Automation (launchd / Daemon):** Triggers silently every night at 
-midnight, running independent of terminal window sessions.
+### Workflow
 
----
+1. **Target Tracking (`novels` table)**
+   - Stores Royal Road novel URLs and static metadata.
 
-## 🛠️ Tech Stack & Dependencies
+2. **Extraction Engine (`scraper.py`)**
+   - Retrieves novel pages using randomized user agents.
+   - Extracts metrics such as views, chapter count, and rating score.
 
-* Language: Python 3.13+
-* Database: PostgreSQL (with DBeaver for database management)
-* Scraping Libraries: requests, BeautifulSoup4, fake-useragent
-* Database Driver: psycopg2-binary
-* Security: python-dotenv (keeps environmental secrets isolated)
-* OS Scheduler: Apple launchd
+3. **Historical Storage (`novel_daily_metrics` table)**
+   - Records daily metric snapshots.
+   - Preserves historical data for trend analysis.
+
+4. **Automation (`launchd`)**
+   - Runs the scraper automatically every night.
+   - Continues running even when no terminal window is open.
 
 ---
 
-## 🚀 Local Installation & Setup
+## 🛠️ Tech Stack
 
-### 1. Clone & Initialize Workspace
-git clone 
-[https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git](https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git)
+| Component | Technology |
+|------------|------------|
+| Language | Python 3 |
+| Database | PostgreSQL |
+| Database Management | DBeaver |
+| Scraping | Requests, BeautifulSoup4, fake-useragent |
+| Database Driver | psycopg2-binary |
+| Configuration | python-dotenv |
+| Scheduling | macOS launchd |
+
+---
+
+## 🚀 Installation & Setup
+
+### 1. Clone the Repository
+
+```bash
+git clone https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git
 cd webnovel-analytics-pipeline
-2. Configure Environment Secrets
-Create a .env file in the root directory (this file is excluded from Git 
-tracking via .gitignore to protect production database passwords):
-Plaintext
+```
+
+### 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+Or install manually:
+
+```bash
+pip install requests beautifulsoup4 fake-useragent psycopg2-binary python-dotenv
+```
+
+### 3. Configure Environment Variables
+
+Create a `.env` file in the project root:
+
+```env
 DB_NAME=webnovel_analytics
 DB_USER=your_db_username
 DB_PASS=your_secure_password
 DB_HOST=localhost
 DB_PORT=5432
-3. Create the Database Schema
-Execute the following DDL script inside your PostgreSQL SQL editor to 
-prepare the storage schemas:
-SQL
+```
+
+The `.env` file should remain excluded from version control.
+
+---
+
+## 🗄️ Database Schema
+
+Run the following SQL script in PostgreSQL:
+
+```sql
 CREATE TABLE novels (
     novel_id SERIAL PRIMARY KEY,
     source_url VARCHAR(500) UNIQUE NOT NULL,
@@ -72,21 +99,103 @@ CREATE TABLE novel_daily_metrics (
     recorded_date DATE DEFAULT CURRENT_DATE,
     view_count INT,
     chapter_count INT,
-    rating_score NUMERIC(3,2),
+    rating_score NUMERIC(4,2),
     UNIQUE (novel_id, recorded_date)
 );
-4. Running the Scraper Manually
-Plaintext
+```
+
+---
+
+## ▶️ Running the Scraper
+
+Execute the scraper manually:
+
+```bash
 python3 scraper.py
-⏰ Background Automation Setup (macOS)
-The background pipeline runs automatically every night at 00:00 
-(Midnight). To register the daemon with macOS launch services:
-Copy the tracking .plist profile file into your local system library:
-Plaintext
+```
+
+Example output:
+
+```text
+Scraping: https://www.royalroad.com/fiction/21220/mother-of-learning
+
+Mother of Learning
+Views: 247631
+Chapters: 109
+Rating: 4.83
+
+Saved snapshot successfully.
+```
+
+---
+
+## ⏰ Background Automation (macOS)
+
+### Copy the Launch Agent
+
+```bash
 cp com.devsoul.novelfetcher.plist ~/Library/LaunchAgents/
-Activate and load the automated schedule:
-Plaintext
+```
+
+### Load the Schedule
+
+```bash
 launchctl load ~/Library/LaunchAgents/com.devsoul.novelfetcher.plist
-Force a test trigger to confirm database entry population:
-Plaintext
+```
+
+### Run a Test Execution
+
+```bash
 launchctl start com.devsoul.novelfetcher
+```
+
+### Verify Status
+
+```bash
+launchctl list | grep novelfetcher
+```
+
+---
+
+## 📂 Project Structure
+
+```text
+webnovel-analytics-pipeline/
+│
+├── scraper.py
+├── requirements.txt
+├── .env
+├── .gitignore
+├── com.devsoul.novelfetcher.plist
+└── README.md
+```
+
+---
+
+## 📈 Future Improvements
+
+- Growth-rate calculations
+- Daily ranking change tracking
+- Automated anomaly detection
+- Dashboard visualization with Streamlit
+- Forecasting models for view growth
+- Multi-source scraping support
+
+---
+
+## 📄 License
+
+This project is intended for educational and portfolio purposes.
+
+---
+
+## 💡 Data Engineering Concepts Demonstrated
+
+- Web scraping and data extraction
+- Scheduled ETL pipelines
+- PostgreSQL relational database design
+- Time-series data modeling
+- Environment-based secret management
+- Automated background job scheduling
+- Historical snapshot tracking
+- Defensive data collection practices
