@@ -42,7 +42,6 @@ midnight, running independent of terminal window sessions.
 ## 🚀 Local Installation & Setup
 
 ### 1. Clone & Initialize Workspace
-```text
 git clone 
 [https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git](https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git)
 cd webnovel-analytics-pipeline
