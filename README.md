@@ -1,6 +1,6 @@
 # 📊 Webnovel Analytics & Time-Series Data Pipeline
 
-An automated data engineering pipeline that scrapes metadata and performance metrics from Royal Road novels, stores daily snapshots in PostgreSQL, and tracks growth trends over time.
+An automated data engineering pipeline that dynamically discovers popular Royal Road novels, scrapes daily performance metrics, stores snapshots in PostgreSQL, and tracks growth trends over time.
 
 Designed to run as a lightweight background service on macOS using native scheduling tools.
 
@@ -12,34 +12,92 @@ The project separates novel metadata from daily performance metrics to support h
 
 ### Workflow
 
-1. **Target Tracking (`novels` table)**
-   - Stores Royal Road novel URLs and static metadata.
+### 1. Automated Discovery Engine
+- Scrapes Royal Road's Active Popular page to dynamically discover trending novels.
+- Automatically inserts newly discovered novels into the database.
 
-2. **Extraction Engine (`scraper.py`)**
-   - Retrieves novel pages using randomized user agents.
-   - Extracts metrics such as views, chapter count, and rating score.
+### 2. Target Tracking (`novels` table)
+- Stores novel URLs, titles, authors, genres, and metadata.
+- Serves as the central catalog of tracked novels.
 
-3. **Historical Storage (`novel_daily_metrics` table)**
-   - Records daily metric snapshots.
-   - Preserves historical data for trend analysis.
+### 3. Extraction Engine (`scraper.py`)
+- Retrieves active novel pages using custom request headers.
+- Extracts:
+  - Total views
+  - Chapter count
+  - Rating score
+  - Author information
+  - Genre information
+- Normalizes raw genre values into a consistent format.
 
-4. **Automation (`launchd`)**
-   - Runs the scraper automatically every night.
-   - Continues running even when no terminal window is open.
+### 4. Historical Storage (`novel_daily_metrics` table)
+- Records daily metric snapshots.
+- Uses PostgreSQL upserts (`ON CONFLICT`) to prevent duplicate records.
+- Preserves historical data for trend analysis and forecasting.
+
+### 5. Automation (`launchd`)
+- Executes the pipeline automatically every night.
+- Runs silently in the background without requiring an active terminal session.
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Component | Technology |
-|------------|------------|
-| Language | Python 3 |
-| Database | PostgreSQL |
-| Database Management | DBeaver |
-| Scraping | Requests, BeautifulSoup4, fake-useragent |
-| Database Driver | psycopg2-binary |
-| Configuration | python-dotenv |
-| Scheduling | macOS launchd |
+| Component | Technology | Purpose |
+|------------|------------|---------|
+| Language | Python 3 | Core ETL logic |
+| Database | PostgreSQL | Relational data storage |
+| Database Management | DBeaver | Querying and administration |
+| Scraping | Requests, BeautifulSoup4 | Data extraction |
+| Database Driver | psycopg2-binary | PostgreSQL connectivity |
+| Data Analytics | Pandas | Data manipulation |
+| Visualization | Plotly Express | Interactive dashboards |
+| Configuration | python-dotenv | Environment management |
+| Scheduling | macOS launchd | Background job scheduling |
+
+---
+
+## 📈 Analytical Capabilities
+
+The schema is designed for time-series analytics and supports advanced SQL analysis.
+
+### Genre Popularity Analysis
+
+Genres are stored as comma-separated values and can be expanded using PostgreSQL functions:
+
+```sql
+SELECT
+    TRIM(genre_name) AS genre,
+    SUM(view_count) AS total_views
+FROM (
+    SELECT
+        UNNEST(STRING_TO_ARRAY(n.genre, ',')) AS genre_name,
+        m.view_count
+    FROM novels n
+    JOIN novel_daily_metrics m
+        ON n.novel_id = m.novel_id
+) t
+GROUP BY genre
+ORDER BY total_views DESC;
+```
+
+### Daily Growth Tracking
+
+Measure daily view growth using window functions:
+
+```sql
+SELECT
+    novel_id,
+    recorded_date,
+    view_count,
+    view_count -
+    LAG(view_count)
+        OVER (
+            PARTITION BY novel_id
+            ORDER BY recorded_date
+        ) AS daily_growth
+FROM novel_daily_metrics;
+```
 
 ---
 
@@ -49,13 +107,14 @@ The project separates novel metadata from daily performance metrics to support h
 
 ```bash
 git clone https://github.com/Omniscient-Reader/webnovel-analytics-pipeline.git
+
 cd webnovel-analytics-pipeline
 ```
 
 ### 2. Install Dependencies
 
 ```bash
-pip install requests beautifulsoup4 fake-useragent psycopg2-binary python-dotenv
+pip install requests beautifulsoup4 psycopg2-binary python-dotenv pandas plotly
 ```
 
 ### 3. Configure Environment Variables
@@ -65,12 +124,10 @@ Create a `.env` file in the project root:
 ```env
 DB_NAME=webnovel_analytics
 DB_USER=your_db_username
-DB_PASS=your_secure_password
+DB_PASSWORD=your_secure_password
 DB_HOST=localhost
 DB_PORT=5432
 ```
-
-The `.env` file should remain excluded from version control.
 
 ---
 
@@ -93,16 +150,18 @@ CREATE TABLE novel_daily_metrics (
     metric_id SERIAL PRIMARY KEY,
     novel_id INT REFERENCES novels(novel_id) ON DELETE CASCADE,
     recorded_date DATE DEFAULT CURRENT_DATE,
-    view_count INT,
+    view_count BIGINT,
     chapter_count INT,
     rating_score NUMERIC(3,2),
     UNIQUE (novel_id, recorded_date)
 );
 ```
 
+**Note:** `view_count` uses `BIGINT` to safely accommodate large traffic volumes.
+
 ---
 
-## ▶️ Running the Scraper
+## ▶️ Running the Pipeline
 
 Execute the scraper manually:
 
@@ -110,18 +169,33 @@ Execute the scraper manually:
 python3 scraper.py
 ```
 
-Example output:
+The scraper will:
 
-```text
-Scraping: https://www.royalroad.com/fiction/21220/mother-of-learning
+- Discover trending novels
+- Update novel metadata
+- Record daily snapshots
+- Store results in PostgreSQL
 
-Mother of Learning
-Views: 247631
-Chapters: 109
-Rating: 4.83
+---
 
-Saved snapshot successfully.
+## 📊 Interactive Data Visualization
+
+The project includes a dedicated visualization module powered by Plotly Express and Pandas.
+
+### Run the Visualizer
+
+```bash
+python3 visualize.py
 ```
+
+### Features
+
+- Interactive line charts
+- Browser-based visualization
+- Zoom and pan support
+- Hover tooltips
+- Multi-novel comparison
+- Time-series trend tracking
 
 ---
 
@@ -139,7 +213,7 @@ cp com.devsoul.novelfetcher.plist ~/Library/LaunchAgents/
 launchctl load ~/Library/LaunchAgents/com.devsoul.novelfetcher.plist
 ```
 
-### Run a Test Execution
+### Run a Test
 
 ```bash
 launchctl start com.devsoul.novelfetcher
@@ -159,6 +233,7 @@ launchctl list | grep novelfetcher
 webnovel-analytics-pipeline/
 │
 ├── scraper.py
+├── visualize.py
 ├── .env
 ├── .gitignore
 └── README.md
@@ -166,30 +241,32 @@ webnovel-analytics-pipeline/
 
 ---
 
+## 💡 Data Engineering Concepts Demonstrated
+
+- ETL pipeline development
+- Automated data ingestion
+- PostgreSQL relational modeling
+- Time-series data storage
+- Historical snapshot tracking
+- Data cleaning and normalization
+- Scheduled workflow automation
+- Interactive analytical visualization
+
+---
+
 ## 📈 Future Improvements
 
-- Growth-rate calculations
 - Daily ranking change tracking
 - Automated anomaly detection
-- Dashboard visualization with Streamlit
-- Forecasting models for view growth
+- Data quality monitoring
+- Forecasting models for growth prediction
 - Multi-source scraping support
+- Streamlit analytics dashboard
+- Docker containerization
+- Apache Airflow orchestration
 
 ---
 
 ## 📄 License
 
-This project is intended for educational and portfolio purposes.
-
----
-
-## 💡 Data Engineering Concepts Demonstrated
-
-- Web scraping and data extraction
-- Scheduled ETL pipelines
-- PostgreSQL relational database design
-- Time-series data modeling
-- Environment-based secret management
-- Automated background job scheduling
-- Historical snapshot tracking
-- Defensive data collection practices
+This project is intended for educational, research, and portfolio purposes.
