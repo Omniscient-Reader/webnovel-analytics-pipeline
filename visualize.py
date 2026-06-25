@@ -46,7 +46,10 @@ def create_visualization():
         labels={"recorded_date": "Date (Күні)", "view_count": "Total Views (Жалпы қаралым)", "title": "Novel (Кітап аты)"},
         markers=True
     )
-    
+    fig_views.update_xaxes(
+        dtick="D1",            # Тек күн сайын көрсету
+        tickformat="%Y-%m-%d"  # Сағаттарды алып тастау
+    )
     # Графиктің дизайнын сәл заманауи қылу
     fig_views.update_layout(
         hovermode="x unified",
