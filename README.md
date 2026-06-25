@@ -55,12 +55,6 @@ cd webnovel-analytics-pipeline
 ### 2. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
-```
-
-Or install manually:
-
-```bash
 pip install requests beautifulsoup4 fake-useragent psycopg2-binary python-dotenv
 ```
 
@@ -87,9 +81,11 @@ Run the following SQL script in PostgreSQL:
 ```sql
 CREATE TABLE novels (
     novel_id SERIAL PRIMARY KEY,
-    source_url VARCHAR(500) UNIQUE NOT NULL,
+    source_url VARCHAR(255) UNIQUE NOT NULL,
     title VARCHAR(255),
-    author VARCHAR(255),
+    author TEXT,
+    genre TEXT,
+    chapter_count INT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -99,7 +95,7 @@ CREATE TABLE novel_daily_metrics (
     recorded_date DATE DEFAULT CURRENT_DATE,
     view_count INT,
     chapter_count INT,
-    rating_score NUMERIC(4,2),
+    rating_score NUMERIC(3,2),
     UNIQUE (novel_id, recorded_date)
 );
 ```
@@ -163,10 +159,8 @@ launchctl list | grep novelfetcher
 webnovel-analytics-pipeline/
 │
 ├── scraper.py
-├── requirements.txt
 ├── .env
 ├── .gitignore
-├── com.devsoul.novelfetcher.plist
 └── README.md
 ```
 
