@@ -1,5 +1,4 @@
-.env
-*.log
-test.html
 __pycache__/
-.DS_Store
+*.pyc
+.env
+logs/*.log
