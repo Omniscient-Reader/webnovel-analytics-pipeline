@@ -1,53 +1,154 @@
-# 📊 Webnovel Analytics & Time-Series Data Pipeline
+# 📚 Webnovel Analytics Pipeline
 
-An automated data engineering pipeline that dynamically discovers popular Royal Road novels, scrapes daily performance metrics, stores snapshots in PostgreSQL, and tracks growth trends over time.
-
-Designed to run as a lightweight background service on macOS using native scheduling tools.
+An automated, production-ready ETL pipeline that tracks light novel metrics (views, chapters, ratings) from Royal Road, stores historical snapshots in PostgreSQL, and visualizes trends through an interactive Streamlit dashboard.
 
 ---
 
-## 🏗️ Architecture & Data Flow
+## 📂 Project Structure
 
-The project separates novel metadata from daily performance metrics to support historical analysis and time-series forecasting.
-
-### Workflow
-
-### 1. Automated Discovery Engine
-- Scrapes Royal Road's Active Popular page to dynamically discover trending novels.
-- Automatically inserts newly discovered novels into the database.
-
-### 2. Target Tracking (`novels` table)
-- Stores novel URLs, titles, authors, genres, and metadata.
-- Serves as the central catalog of tracked novels.
-
-### 3. Extraction Engine (`scraper.py`)
-- Retrieves active novel pages using custom request headers.
-- Extracts:
-  - Total views
-  - Chapter count
-  - Rating score
-  - Author information
-  - Genre information
-- Normalizes raw genre values into a consistent format.
-
-### 4. Historical Storage (`novel_daily_metrics` table)
-- Records daily metric snapshots.
-- Uses PostgreSQL upserts (`ON CONFLICT`) to prevent duplicate records.
-- Preserves historical data for trend analysis and forecasting.
-
-### 5. Automation (`launchd`)
-- Executes the pipeline automatically every night.
-- Runs silently in the background without requiring an active terminal session.
+```text
+webnovel-analytics/
+├── Dockerfile                  # Docker container configuration
+├── README.md                   # Project documentation
+├── app/
+│   ├── __init__.py
+│   ├── scraper.py              # Core ETL pipeline & web scraper
+│   └── dashboard.py            # Streamlit analytics dashboard
+├── logs/
+│   ├── scraper.log             # General pipeline logs
+│   └── scraper_error.log       # Error logs
+├── requirements.txt            # Python dependencies
+└── tests/
+    └── test_scraper.py         # Automated unit tests
+```
 
 ---
 
-## 🛠️ Tech Stack
+# 💡 Data Engineering Concepts Demonstrated (Quick & Simple)
 
-| Component | Technology | Purpose |
-|------------|------------|---------|
-| Language | Python 3 | Core ETL logic |
-| Database | PostgreSQL | Relational data storage |
-| Database Management | DBeaver | Querying and administration |
+### 🏗️ ETL Pipeline
+Automatically fetches raw web data (**Extract**), cleans it (**Transform**), and loads it into PostgreSQL (**Load**) without manual intervention.
+
+### 🔄 Automated Ingestion
+The pipeline visits Royal Road's trending page, discovers newly popular novels, and automatically inserts them into the database.
+
+### 🗄️ Relational Modeling
+Separates permanent novel metadata (`novels`) from changing daily metrics (`novel_daily_metrics`) using relational keys and cascading deletes.
+
+### 📸 Historical Snapshots
+Stores one snapshot per novel each day without overwriting previous records, enabling complete time-series analysis.
+
+### 🧼 Data Cleaning
+Normalizes messy genre URLs and raw scraped values into consistent, structured data.
+
+### ⚙️ Workflow Automation
+Runs automatically every night using macOS LaunchAgents (`launchd`) without requiring user interaction.
+
+### 📊 Analytical Visualization
+Provides an interactive Streamlit dashboard with Plotly charts for exploring growth trends.
+
+### 🪵 Production Logging & Resiliency
+
+**Auto-Archive**
+
+Uses `RotatingFileHandler` with a 5 MB limit so log files never grow indefinitely.
+
+**Crash Proof**
+
+If one novel fails during processing, the pipeline safely logs the error, rolls back the failed database transaction, and continues processing the remaining novels.
+
+---
+
+# 🛠️ Tech Stack & Tools
+
+| Component | Technology |
+|-----------|------------|
+| Language | Python 3.10+ |
+| Database | PostgreSQL |
+| Web Scraping | Requests, BeautifulSoup4 |
+| Database Driver | Psycopg2 |
+| Data Analysis | Pandas |
+| Visualization | Streamlit, Plotly Express |
+| Testing | Pytest |
+| DevOps | Docker |
+
+---
+
+# 🚀 How to Run Locally
+
+## 1. Setup Environment
+
+Clone the repository and create a `.env` file inside the project root.
+
+```env
+DB_NAME=your_db_name
+DB_USER=your_db_user
+DB_PASSWORD=your_db_password
+DB_HOST=localhost
+DB_PORT=5432
+```
+
+---
+
+## 2. Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+---
+
+## 3. Run Automated Tests
+
+Before executing the pipeline, verify that all tests pass.
+
+```bash
+python3 -m pytest tests/
+```
+
+---
+
+## 4. Run the ETL Pipeline
+
+Execute the scraper manually.
+
+```bash
+python3 app/scraper.py
+```
+
+---
+
+## 5. Launch the Analytics Dashboard
+
+Start the interactive Streamlit application.
+
+```bash
+streamlit run app/dashboard.py
+```
+
+---
+
+# 🐳 Docker Deployment
+
+Build the Docker image.
+
+```bash
+docker build -t webnovel-analytics .
+```
+
+Run the container.
+
+```bash
+docker run -p 8501:8501 --env-file .env webnovel-analytics
+```
+
+Open your browser and navigate to:
+
+```
+http://localhost:8501
+```
+
+to explore the live analytics dashboard.| Database Management | DBeaver | Querying and administration |
 | Scraping | Requests, BeautifulSoup4 | Data extraction |
 | Database Driver | psycopg2-binary | PostgreSQL connectivity |
 | Data Analytics | Pandas | Data manipulation |
