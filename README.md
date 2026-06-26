@@ -4,7 +4,7 @@ An automated, production-ready ETL pipeline that tracks light novel metrics (vie
 
 ---
 
-## 📂 Project Structure
+# 📂 Project Structure
 
 ```text
 webnovel-analytics/
@@ -24,27 +24,34 @@ webnovel-analytics/
 
 ---
 
-# 💡 Data Engineering Concepts Demonstrated (Quick & Simple)
+# 💡 Data Engineering Concepts Demonstrated
 
 ### 🏗️ ETL Pipeline
+
 Automatically fetches raw web data (**Extract**), cleans it (**Transform**), and loads it into PostgreSQL (**Load**) without manual intervention.
 
 ### 🔄 Automated Ingestion
+
 The pipeline visits Royal Road's trending page, discovers newly popular novels, and automatically inserts them into the database.
 
 ### 🗄️ Relational Modeling
+
 Separates permanent novel metadata (`novels`) from changing daily metrics (`novel_daily_metrics`) using relational keys and cascading deletes.
 
 ### 📸 Historical Snapshots
+
 Stores one snapshot per novel each day without overwriting previous records, enabling complete time-series analysis.
 
 ### 🧼 Data Cleaning
+
 Normalizes messy genre URLs and raw scraped values into consistent, structured data.
 
 ### ⚙️ Workflow Automation
-Runs automatically every night using macOS LaunchAgents (`launchd`) without requiring user interaction.
+
+Runs automatically every night using macOS LaunchAgents (`launchd`) or cron without requiring user interaction.
 
 ### 📊 Analytical Visualization
+
 Provides an interactive Streamlit dashboard with Plotly charts for exploring growth trends.
 
 ### 🪵 Production Logging & Resiliency
@@ -59,11 +66,26 @@ If one novel fails during processing, the pipeline safely logs the error, rolls 
 
 ---
 
-## 📊 Useful SQL Analytics Queries
+# 🛠️ Tech Stack & Tools
+
+| Component | Technology |
+|-----------|------------|
+| Language | Python 3.10+ |
+| Database | PostgreSQL |
+| Web Scraping | Requests, BeautifulSoup4 |
+| Database Driver | Psycopg2 |
+| Data Analysis | Pandas |
+| Visualization | Streamlit, Plotly Express |
+| Testing | Pytest |
+| DevOps | Docker |
+
+---
+
+# 📊 Useful SQL Analytics Queries
 
 Since the pipeline tracks daily time-series metrics, you can run the following SQL queries in your PostgreSQL terminal to extract meaningful insights.
 
-### 1. Top 5 Most Viewed Novels Today
+## 1. Top 5 Most Viewed Novels Today
 
 Finds the most popular novels based on the latest crawled snapshot.
 
@@ -83,7 +105,7 @@ LIMIT 5;
 
 ---
 
-### 2. Novel Growth Tracker (Views Gained Over Time)
+## 2. Novel Growth Tracker (Views Gained Over Time)
 
 Calculates how many new views each novel has gained since it was first tracked.
 
@@ -102,7 +124,7 @@ ORDER BY views_gained DESC;
 
 ---
 
-### 3. Average Rating and Total Chapters per Genre
+## 3. Average Rating and Total Chapters per Genre
 
 Aggregates scraped data to identify which genres perform best.
 
@@ -119,28 +141,48 @@ WHERE m.recorded_date = CURRENT_DATE
 GROUP BY n.genre
 ORDER BY total_books DESC;
 ```
----
-
-# 🛠️ Tech Stack & Tools
-
-| Component | Technology |
-|-----------|------------|
-| Language | Python 3.10+ |
-| Database | PostgreSQL |
-| Web Scraping | Requests, BeautifulSoup4 |
-| Database Driver | Psycopg2 |
-| Data Analysis | Pandas |
-| Visualization | Streamlit, Plotly Express |
-| Testing | Pytest |
-| DevOps | Docker |
 
 ---
 
 # 🚀 How to Run Locally
 
-## 1. Setup Environment
+Follow these step-by-step instructions to clone the repository, configure your environment, and run the pipeline locally.
 
-Clone the repository and create a `.env` file inside the project root.
+## 1. Clone the Repository
+
+```bash
+git clone https://github.com/YOUR_USERNAME/webnovel-analytics.git
+cd webnovel-analytics
+```
+
+> Replace `YOUR_USERNAME` with your actual GitHub username.
+
+---
+
+## 2. Create a Virtual Environment (Recommended)
+
+```bash
+# Create the virtual environment
+python3 -m venv venv
+
+# Activate on macOS/Linux
+source venv/bin/activate
+
+# Activate on Windows PowerShell
+# .\venv\Scripts\Activate.ps1
+```
+
+---
+
+## 3. Configure Environment Variables
+
+Create a `.env` file in the project root.
+
+```bash
+touch .env
+```
+
+Fill it with your PostgreSQL credentials.
 
 ```env
 DB_NAME=your_db_name
@@ -152,17 +194,17 @@ DB_PORT=5432
 
 ---
 
-## 2. Install Dependencies
+## 4. Install Dependencies
 
 ```bash
-pip install -r requirements.txt
+python3 -m pip install -r requirements.txt
 ```
 
 ---
 
-## 3. Run Automated Tests
+## 5. Verify the Installation
 
-Before executing the pipeline, verify that all tests pass.
+Run the automated unit tests.
 
 ```bash
 python3 -m pytest tests/
@@ -170,7 +212,7 @@ python3 -m pytest tests/
 
 ---
 
-## 4. Run the ETL Pipeline
+## 6. Run the ETL Pipeline
 
 Execute the scraper manually.
 
@@ -180,13 +222,21 @@ python3 app/scraper.py
 
 ---
 
-## 5. Launch the Analytics Dashboard
+## 7. Launch the Analytics Dashboard
 
-Start the interactive Streamlit application.
+Start the Streamlit dashboard.
 
 ```bash
 streamlit run app/dashboard.py
 ```
+
+Then open:
+
+```
+http://localhost:8501
+```
+
+in your browser.
 
 ---
 
