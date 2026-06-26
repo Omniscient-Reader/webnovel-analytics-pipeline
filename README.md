@@ -241,17 +241,17 @@ webnovel-analytics-pipeline/
 
 ---
 
-## 💡 Data Engineering Concepts Demonstrated
+## 💡 Data Engineering Concepts Demonstrated (Quick & Simple)
 
-- 🏗️ **ETL Pipeline Development:** Built modular Python extraction logic separated from orchestration layers.
-- 🔄 **Automated Data Ingestion:** Implemented dynamic target discovery from external platform indexing pages.
-- 🗄️ **PostgreSQL Relational Modeling:** Structured decoupled metadata and metrics entities utilizing constraints and cascading deletes.
-- 📈 **Time-Series Data Storage:** Designed sequential tracking with robust `ON CONFLICT` upsert handling.
-- 📸 **Historical Snapshot Tracking:** State-based capturing engine preventing historical data mutations.
-- 🧼 **Data Cleaning & Normalization:** Robust parsing logic parsing JSON-LD payloads and flattening text arrays.
-- ⚙️ **Scheduled Workflow Automation:** Native OS background process management using production-ready `launchd`.
-- 📊 **Interactive Analytical Visualization:** Integrated Pandas indexing with Plotly charts for exploratory analysis.
-- 🪵 **Production Logging & Resiliency:** Configured self-archiving `RotatingFileHandler` with localized modular execution diagnostics and strict atomic transaction rollback handling.
+* 🏗️ **ETL Pipeline:** Automatically fetches raw web data (**E**xtract), cleans it (**T**ransform), and loads it into the database (**L**oad) without human help.
+* 🔄 **Automated Ingestion:** The script automatically visits trending pages, discovers new popular books, and adds them to the database on its own.
+* 🗄️ **Relational Modeling:** Separates permanent book info (`novels`) from changing daily numbers (`novel_daily_metrics`) to keep data organized.
+* 📸 **Historical Snapshots:** Saves a daily "photo" of statistics without overwriting the past, creating a perfect history log for growth analysis.
+* 🧼 **Data Cleaning:** Automatically strips messy web links and converts them into clean, structured text tags (e.g., `Action, Sci-Fi`).
+* ⚙️ **Workflow Automation:** Scheduled via macOS `launchd` to run silently in the background every single night while you sleep.
+* 📊 **Analytical Visualization:** Turns dry database numbers into a live, interactive timeline chart in your browser using Pandas and Plotly.
+* 🪵 **Production Logging & Resiliency:** - **Auto-Archive:** Uses a 5MB cap (`RotatingFileHandler`) so log files never overload your computer's disk space.
+  - **Crash Proof:** If one book fails, the script logs the error, rolls back the database safely (`rollback()`), and skips to the next book without crashing.
 
 ---
 
