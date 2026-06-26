@@ -59,6 +59,68 @@ If one novel fails during processing, the pipeline safely logs the error, rolls 
 
 ---
 
+## 📊 Useful SQL Analytics Queries
+
+Since the pipeline tracks daily time-series metrics, you can run the following SQL queries in your PostgreSQL terminal to extract meaningful insights.
+
+### 1. Top 5 Most Viewed Novels Today
+
+Finds the most popular novels based on the latest crawled snapshot.
+
+```sql
+SELECT
+    n.title,
+    m.view_count,
+    m.rating_score,
+    m.chapter_count
+FROM novel_daily_metrics m
+JOIN novels n
+    ON m.novel_id = n.novel_id
+WHERE m.recorded_date = CURRENT_DATE
+ORDER BY m.view_count DESC
+LIMIT 5;
+```
+
+---
+
+### 2. Novel Growth Tracker (Views Gained Over Time)
+
+Calculates how many new views each novel has gained since it was first tracked.
+
+```sql
+SELECT
+    n.title,
+    MIN(m.view_count) AS initial_views,
+    MAX(m.view_count) AS current_views,
+    (MAX(m.view_count) - MIN(m.view_count)) AS views_gained
+FROM novel_daily_metrics m
+JOIN novels n
+    ON m.novel_id = n.novel_id
+GROUP BY n.title
+ORDER BY views_gained DESC;
+```
+
+---
+
+### 3. Average Rating and Total Chapters per Genre
+
+Aggregates scraped data to identify which genres perform best.
+
+```sql
+SELECT
+    n.genre,
+    COUNT(DISTINCT n.novel_id) AS total_books,
+    ROUND(AVG(m.rating_score)::numeric, 2) AS avg_rating,
+    MAX(m.chapter_count) AS max_chapters
+FROM novels n
+JOIN novel_daily_metrics m
+    ON n.novel_id = m.novel_id
+WHERE m.recorded_date = CURRENT_DATE
+GROUP BY n.genre
+ORDER BY total_books DESC;
+```
+---
+
 # 🛠️ Tech Stack & Tools
 
 | Component | Technology |
