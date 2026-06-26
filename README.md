@@ -243,14 +243,15 @@ webnovel-analytics-pipeline/
 
 ## 💡 Data Engineering Concepts Demonstrated
 
-- ETL pipeline development
-- Automated data ingestion
-- PostgreSQL relational modeling
-- Time-series data storage
-- Historical snapshot tracking
-- Data cleaning and normalization
-- Scheduled workflow automation
-- Interactive analytical visualization
+- 🏗️ **ETL Pipeline Development:** Built modular Python extraction logic separated from orchestration layers.
+- 🔄 **Automated Data Ingestion:** Implemented dynamic target discovery from external platform indexing pages.
+- 🗄️ **PostgreSQL Relational Modeling:** Structured decoupled metadata and metrics entities utilizing constraints and cascading deletes.
+- 📈 **Time-Series Data Storage:** Designed sequential tracking with robust `ON CONFLICT` upsert handling.
+- 📸 **Historical Snapshot Tracking:** State-based capturing engine preventing historical data mutations.
+- 🧼 **Data Cleaning & Normalization:** Robust parsing logic parsing JSON-LD payloads and flattening text arrays.
+- ⚙️ **Scheduled Workflow Automation:** Native OS background process management using production-ready `launchd`.
+- 📊 **Interactive Analytical Visualization:** Integrated Pandas indexing with Plotly charts for exploratory analysis.
+- 🪵 **Production Logging & Resiliency:** Configured self-archiving `RotatingFileHandler` with localized modular execution diagnostics and strict atomic transaction rollback handling.
 
 ---
 
