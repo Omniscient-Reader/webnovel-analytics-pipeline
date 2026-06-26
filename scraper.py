@@ -6,8 +6,23 @@ from bs4 import BeautifulSoup
 import psycopg2
 from datetime import datetime
 from dotenv import load_dotenv
+import logging
 
+# .env файлын жүктеу
 load_dotenv(dotenv_path='/Users/birzhanmeyrkhan/webnovel-analytics/.env')
+
+# 1. Лог жүйесін баптау
+LOG_FILE = '/Users/birzhanmeyrkhan/webnovel-analytics/scraper.log'
+
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[
+        logging.FileHandler(LOG_FILE, encoding='utf-8'),
+        logging.StreamHandler()
+    ]
+)
 
 headers = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
@@ -35,13 +50,13 @@ def extract_genre_name(genre_data):
     return clean_single_genre(genre_data)
 
 def discover_popular_novels(cursor, conn):
-    print("Royal Road-тан танымал кітаптар тізімін автоматты түрде оқу...")
+    logging.info("Royal Road-тан танымал кітаптар тізімін автоматты түрде оқу басталды...")
     popular_url = "https://www.royalroad.com/fictions/active-popular"
     
     try:
         response = requests.get(popular_url, headers=headers, timeout=15)
         if response.status_code != 200:
-            print(f"Тізімді оқу мүмкін болмады. HTTP {response.status_code}")
+            logging.error(f"Тізімді оқу мүмкін болмады. HTTP {response.status_code}")
             return
             
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -62,33 +77,40 @@ def discover_popular_novels(cursor, conn):
                         (title, full_url)
                     )
                     conn.commit()
-                    print(f"Базаға жаңа кітап табылып қосылды: {title}")
+                    logging.info(f"Базаға жаңа кітап табылып қосылды: [{title}]")
                     
     except Exception as e:
-        print(f"Танымал кітаптарды іздеу кезінде қате кетті: {e}")
+        logging.exception(f"Танымал кітаптарды іздеу кезінде күтпеген қате кетті: {e}")
 
 def scrape_and_update():
-    conn = psycopg2.connect(
-        dbname=os.getenv("DB_NAME"),
-        user=os.getenv("DB_USER"),
-        password=os.getenv("DB_PASSWORD"),
-        host=os.getenv("DB_HOST"),
-        port=os.getenv("DB_PORT")
-    )
-    cursor = conn.cursor()
+    logging.info("ETL Процесі басталды. Базаға қосылуда...")
+    try:
+        conn = psycopg2.connect(
+            dbname=os.getenv("DB_NAME"),
+            user=os.getenv("DB_USER"),
+            password=os.getenv("DB_PASSWORD"),
+            host=os.getenv("DB_HOST"),
+            port=os.getenv("DB_PORT")
+        )
+        cursor = conn.cursor()
+        logging.info("Базамен байланыс сәтті орнатылды.")
+    except Exception as e:
+        logging.error(f"Базаға қосылу сәтсіз аяқталды: {e}")
+        return
 
     discover_popular_novels(cursor, conn)
 
     cursor.execute("SELECT novel_id, title, source_url FROM novels;")
     novels = cursor.fetchall()
+    logging.info(f"Базадан өңделетін {len(novels)} кітап табылды.")
 
     for novel_id, title, source_url in novels:
         try:
-            print(f"Scraping: {title}...")
+            logging.info(f"Scraping: [{title}] -> {source_url}")
             response = requests.get(source_url, headers=headers, timeout=15)
             
             if response.status_code != 200:
-                print(f"Skipping {title}: HTTP Status {response.status_code}")
+                logging.warning(f"Өткізіп жіберілді [{title}]: HTTP Status {response.status_code}")
                 continue
                 
             soup = BeautifulSoup(response.text, 'html.parser')
@@ -145,14 +167,15 @@ def scrape_and_update():
                 (novel_id, datetime.today().date(), chapters, views, rating_score)
             )
             conn.commit()
-            print(f"Updated {title}. Author: {author}, Genre: {genre}, Views: {views}, Chapters: {chapters}")
+            logging.info(f"Сәтті жаңартылды [{title}]. Жанр: {genre} | Қаралым: {views} | Тарау: {chapters}")
 
         except Exception as e:
             conn.rollback()
-            print(f"Error processing {title}: {e}")
+            logging.error(f"[{title}] кітабын өңдеуде қате шықты: {e}", exc_info=True)
 
     cursor.close()
     conn.close()
+    logging.info("ETL Процесі толықтай және сәтті аяқталды.\n" + "="*50)
 
 if __name__ == '__main__':
     scrape_and_update()
