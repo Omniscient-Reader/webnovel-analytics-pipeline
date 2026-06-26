@@ -10,31 +10,23 @@ import logging
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-# 1. Динамикалық (Absolute емес) жолдарды анықтау (Production Path)
-BASE_DIR = Path(__file__).resolve().parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / "logs"
-LOG_DIR.mkdir(exist_ok=True)  # logs папкасы жоқ болса, өзі құрады
+LOG_DIR.mkdir(exist_ok=True)
 LOG_FILE = LOG_DIR / "scraper.log"
 
-# .env файлын жүктеу (BASE_DIR арқылы)
 load_dotenv(dotenv_path=BASE_DIR / ".env")
 
-# 2. Логгерді баптау және Logger Name қосу
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-# Ескі баптаулар араласып кетпеуі үшін тазалау
 if logger.hasHandlers():
     logger.handlers.clear()
 
-# Форматқа логгердің атын (%(name)s) қостық
 formatter = logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-# 3. RotatingFileHandler (Макс: 5MB, ескі 3 архивті сақтайды)
 file_handler = RotatingFileHandler(LOG_FILE, maxBytes=5 * 1024 * 1024, backupCount=3, encoding='utf-8')
 file_handler.setFormatter(formatter)
-
-# Терминалға шығаруға арналған StreamHandler
 stream_handler = logging.StreamHandler()
 stream_handler.setFormatter(formatter)
 
@@ -70,52 +62,31 @@ def discover_popular_novels(cursor, conn):
     logger.info("Royal Road-тан танымал кітаптар тізімін автоматты түрде оқу басталды...")
     popular_url = "https://www.royalroad.com/fictions/active-popular"
     new_novels_count = 0
-    
     try:
         response = requests.get(popular_url, headers=headers, timeout=15)
         if response.status_code != 200:
             logger.error(f"Тізімді оқу мүмкін болмады. HTTP {response.status_code}")
             return new_novels_count
-            
         soup = BeautifulSoup(response.text, 'html.parser')
         novel_links = soup.find_all('h2', class_='fiction-title')
-        
         for link_element in novel_links:
             a_tag = link_element.find('a')
             if a_tag and 'href' in a_tag.attrs:
                 title = a_tag.text.strip()
                 full_url = "https://www.royalroad.com" + a_tag['href']
-                
                 cursor.execute("SELECT novel_id FROM novels WHERE source_url = %s;", (full_url,))
                 exists = cursor.fetchone()
-                
                 if not exists:
-                    cursor.execute(
-                        "INSERT INTO novels (title, source_url) VALUES (%s, %s);",
-                        (title, full_url)
-                    )
+                    cursor.execute("INSERT INTO novels (title, source_url) VALUES (%s, %s);", (title, full_url))
                     conn.commit()
                     new_novels_count += 1
-                    logger.info(f"Базаға жаңа кітап табылып қосылды: [{title}]")
-                    
     except Exception as e:
-        logger.exception(f"Танымал кітаптарды іздеу кезінде күтпеген қате кетті: {e}")
-        
+        logger.exception(f"Танымал кітаптарды іздеу кезінде қате кетті: {e}")
     return new_novels_count
 
 def scrape_and_update():
-    # 4. Runtime басы
     start_time = datetime.now()
-    
-    # Статистикаға арналған айнымалылар
-    stats = {
-        "processed": 0,
-        "success": 0,
-        "failed": 0,
-        "new_novels": 0
-    }
-
-    logger.info("ETL Процесі басталды. Базаға қосылуда...")
+    stats = {"processed": 0, "success": 0, "failed": 0, "new_novels": 0}
     try:
         conn = psycopg2.connect(
             dbname=os.getenv("DB_NAME"),
@@ -125,37 +96,24 @@ def scrape_and_update():
             port=os.getenv("DB_PORT")
         )
         cursor = conn.cursor()
-        logger.info("Базамен байланыс сәтті орнатылды.")
     except Exception as e:
         logger.error(f"Базаға қосылу сәтсіз аяқталды: {e}")
         return
 
-    # Жаңа кітаптарды іздеу және санын жазу
     stats["new_novels"] = discover_popular_novels(cursor, conn)
-
     cursor.execute("SELECT novel_id, title, source_url FROM novels;")
     novels = cursor.fetchall()
     stats["processed"] = len(novels)
-    logger.info(f"Базадан өңделетін {stats['processed']} кітап табылды.")
 
     for novel_id, title, source_url in novels:
         try:
-            logger.info(f"Scraping: [{title}] -> {source_url}")
             response = requests.get(source_url, headers=headers, timeout=15)
-            
             if response.status_code != 200:
-                logger.warning(f"Өткізіп жіберілді [{title}]: HTTP Status {response.status_code}")
                 stats["failed"] += 1
                 continue
-                
             soup = BeautifulSoup(response.text, 'html.parser')
-
             json_element = soup.find('script', type='application/ld+json')
-            views = 0
-            rating_score = 0.0
-            author = "Unknown Author"
-            genre = "Unknown"
-
+            views, rating_score, author, genre = 0, 0.0, "Unknown Author", "Unknown"
             if json_element:
                 data = json.loads(json_element.string)
                 if 'interactionStatistic' in data:
@@ -166,65 +124,29 @@ def scrape_and_update():
                     author = data['author']['name']
                 if 'genre' in data:
                     genre = extract_genre_name(data['genre'])
-
             chapters = 0
             chapters_table = soup.find('table', id='chapters')
             if chapters_table:
                 chapters = len(chapters_table.find_all('tr', class_='chapter-row'))
-            
-            if chapters == 0:
-                chapters = len(soup.find_all('tr', class_='chapter-row'))
-                
-            if chapters == 0:
-                for li in soup.find_all('li'):
-                    if 'Chapters' in li.text:
-                        match = re.search(r'Chapters\s*:\s*(\d+)', li.text, re.IGNORECASE)
-                        if match:
-                            chapters = int(match.group(1))
-                            break
 
-            cursor.execute(
-                """
-                UPDATE novels 
-                SET title = %s, author = %s, genre = %s, chapter_count = %s
-                WHERE novel_id = %s;
-                """,
-                (title, author, genre, chapters, novel_id)
-            )
-
-            cursor.execute(
-                """
+            cursor.execute("UPDATE novels SET title = %s, author = %s, genre = %s WHERE novel_id = %s;", (title, author, genre, novel_id))
+            cursor.execute("""
                 INSERT INTO novel_daily_metrics (novel_id, recorded_date, chapter_count, view_count, rating_score)
                 VALUES (%s, %s, %s, %s, %s)
                 ON CONFLICT (novel_id, recorded_date) DO UPDATE 
                 SET chapter_count = EXCLUDED.chapter_count, view_count = EXCLUDED.view_count, rating_score = EXCLUDED.rating_score;
-                """,
-                (novel_id, datetime.today().date(), chapters, views, rating_score)
-            )
+            """, (novel_id, datetime.today().date(), chapters, views, rating_score))
             conn.commit()
             stats["success"] += 1
-            logger.info(f"Сәтті жаңартылды [{title}]. Жанр: {genre} | Қаралым: {views} | Тарау: {chapters}")
-
         except Exception as e:
             conn.rollback()
             stats["failed"] += 1
-            logger.error(f"[{title}] кітабын өңдеуде қате шықты: {e}", exc_info=True)
+            logger.error(f"[{title}] өңдеуде қате: {e}")
 
     cursor.close()
     conn.close()
-    
-    # 5. Runtime соңы және Статистика қорытындысы (Summary)
-    end_time = datetime.now()
-    duration = (end_time - start_time).total_seconds()
-    
-    logger.info("\n" + "="*50 + "\n" + 
-                "📊 ETL RUN STATISTICS SUMMARY:\n" + 
-                f"   - Processed:  {stats['processed']} novels\n" + 
-                f"   - Success:    {stats['success']}\n" + 
-                f"   - Failed:     {stats['failed']}\n" + 
-                f"   - New Novels: {stats['new_novels']}\n" + 
-                f"   - Runtime:    {duration:.2f} seconds\n" + 
-                "="*50)
+    duration = (datetime.now() - start_time).total_seconds()
+    logger.info(f"ETL Аяқталды. Табысты: {stats['success']}, Қате: {stats['failed']}, Уақыты: {duration:.2f} сек")
 
 if __name__ == '__main__':
     scrape_and_update()
